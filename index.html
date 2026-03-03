@@ -212,9 +212,60 @@ body, html {
 </head>
 <body>
 
+<div id="canvas-container"></div>
+<div id="finger-cursor"></div>
+
+<button id="back-to-main-btn" class="hidden">⬅ 返回记忆宇宙</button>
+
+<button id="add-panel-btn" class="hidden">➕ 添加面板</button>
+
+<div id="instructions">
+  <div class="inst-header">
+    <strong>🌟 交互视界操作指南：</strong>
+    <button id="minimize-inst-btn" title="最小化">➖</button>
+  </div>
+  <p>【记忆球界面】</p>
+  <p>1. <strong>滑动滚轮</strong>：缩放全局视野。</p>
+  <p>2. <strong>鼠标拖拽</strong>：推挤水晶球。</p>
+  <p>3. <strong>点击水晶球</strong>：进入 3D 卧室。</p>
+  <br>
+  <p>【3D 卧室漫游】</p>
+  <p>1. <strong>鼠标左键拖拽</strong>：自由旋转环顾。</p>
+  <p>2. <strong>鼠标右键拖拽</strong>：平移画面。</p>
+  <p>3. <strong>滑动滚轮</strong>：拉近/拉远距离。</p>
+  <p>4. <strong>键盘 W A S D</strong>：主角漫游行走。</p>
+</div>
+
+<div id="minimized-instructions" class="hidden">
+  <button id="maximize-inst-btn">📘 Sara云盘世界的指南</button>
+</div>
+
+<input type="file" id="sys-file-input" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt" style="display: none;" />
+
+<div id="liquid-modal-overlay" class="hidden">
+  <div id="liquid-modal">
+    <div class="modal-header">
+      <button id="modal-edit-btn" class="glass-btn">编辑</button>
+      <h3 id="modal-title">新建资料集</h3>
+      <div class="header-right">
+        <button id="modal-add-btn" class="glass-btn primary-btn">➕ 添加文件</button>
+        <button id="modal-close-btn" class="glass-btn close-btn">✖</button>
+      </div>
+    </div>
+    
+    <div class="modal-content" id="modal-file-grid"></div>
+
+    <div id="modal-edit-bar" class="hidden">
+      <button id="modal-cancel-btn" class="glass-btn">取消</button>
+      <div id="modal-select-count">已选择 0 项</div>
+      <button id="modal-delete-btn" class="glass-btn danger-btn">删除</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 // ======================================================= //
-// 👇👇👇 第 3 步：在这里粘贴你的所有 JS 代码 👇👇👇 //
+// 👇👇👇 第 2 步：在这里粘贴你的所有 JS 代码 👇👇👇 //
 // ======================================================= //
 
 import * as THREE from 'three';
