@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Sara的记忆元宇宙</title>
+    
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.136.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.136.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <style>
+        body, html {
+          margin: 0; padding: 0; overflow: hidden; background-color: #ffffff; 
+          font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; user-select: none;
+        }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        #finger-cursor {
+          position: absolute; width: 20px; height: 20px;
+          background: radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(0,212,255,0.8) 100%);
+          border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); z-index: 10;
+          box-shadow: 0 0 15px 5px rgba(0, 212, 255, 0.4); transition: transform 0.1s ease-out;
+        }
+
+        #add-panel-btn {
+          position: absolute; top: 25px; right: 25px; z-index: 100; padding: 10px 20px;
+          background: rgba(0, 0, 0, 0.8); color: #fff; border: none; border-radius: 20px;
+          font-size: 14px; font-weight: bold; cursor: pointer; backdrop-filter: blur(10px);
+          box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.2s;
+        }
+        #add-panel-btn:hover { background: #0071e3; }
+        #add-panel-btn.hidden { display: none; }
+
+        #back-to-main-btn {
+          position: absolute; top: 25px; left: 25px; z-index: 100; padding: 10px 20px;
+          background: rgba(255, 255, 255, 0.85); color: #1d1d1f; border: 1px solid rgba(0,0,0,0.05); border-radius: 20px;
+          font-size: 14px; font-weight: bold; cursor: pointer; backdrop-filter: blur(10px);
+          box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all 0.2s;
+        }
+        #back-to-main-btn:hover { background: #fff; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+        #back-to-main-btn.hidden { display: none; }
+
+        #instructions {
+          position: absolute; bottom: 25px; left: 25px; color: #64748b; z-index: 5;
+          font-size: 14px; line-height: 1.6; background: rgba(255, 255, 255, 0.85);
+          padding: 15px 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+          backdrop-filter: blur(15px); transition: opacity 0.3s;
+        }
+        #instructions.hidden { display: none; }
+        .inst-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 5px; }
+        #minimize-inst-btn { background: none; border: none; font-size: 16px; cursor: pointer; color: #999; }
+        #minimize-inst-btn:hover { color: #000; }
+
+        #minimized-instructions { position: absolute; bottom: 25px; left: 25px; z-index: 5; }
+        #minimized-instructions.hidden { display: none; }
+        #maximize-inst-btn {
+          padding: 12px 20px; background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(0,0,0,0.05);
+          border-radius: 12px; cursor: pointer; font-weight: bold; color: #1d1d1f;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.1); backdrop-filter: blur(10px);
+        }
+
+        .memoir-panel-container { position: absolute; top: 0; left: 0; transform-origin: center center; pointer-events: none; }
+
+        .drag-handle {
+          position: absolute; top: -60px; left: 50%; transform: translateX(-50%) translateY(0) rotate(0deg) scale(1);
+          font-size: 72px; cursor: grab; pointer-events: auto; z-index: 10;
+          transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
+          filter: drop-shadow(0 5px 6px rgba(0,0,0,0.5)); 
+        }
+        .drag-handle:hover, .drag-handle.is-dragging {
+          cursor: grabbing; transform: translateX(-50%) translateY(-20px) rotate(15deg) scale(1.1);
+          filter: drop-shadow(10px 20px 15px rgba(0,0,0,0.3)); 
+        }
+
+        .memoir-card {
+          width: 340px; background: rgba(255, 255, 255, 0.55);
+          backdrop-filter: blur(25px) saturate(150%); -webkit-backdrop-filter: blur(25px) saturate(150%);
+          border: 1px solid rgba(255,255,255,0.7); border-radius: 24px; padding: 18px;
+          box-shadow: 0 20px 50px rgba(0,0,0,0.15), inset 0 0 0 1px rgba(255,255,255,0.3);
+          text-align: center; pointer-events: auto; 
+          transition: transform 0.2s, background 0.2s; cursor: pointer;
+        }
+        .memoir-card:hover { transform: scale(1.02); background: rgba(255, 255, 255, 0.65); }
+
+        .carousel-container { width: 100%; height: 200px; border-radius: 16px; overflow: hidden; position: relative; background: #000; }
+        .carousel-container img, .carousel-container video { 
+          width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0; transform: scale(1);
+          transition: opacity 0.8s ease-in-out, transform 4.5s linear; 
+        }
+        .carousel-container .active { opacity: 1; transform: scale(1.15); }
+
+        .empty-cover {
+          width: 100%; height: 100%; position: absolute; top: 0; left: 0;
+          background: #f5f5f7; display: flex; align-items: center; justify-content: center;
+          font-size: 80px; font-weight: 300; color: #c1c1c4; opacity: 0; transition: opacity 0.4s ease;
+        }
+        .empty-cover.active { opacity: 1; }
+
+        .title-input {
+          width: 100%; margin-top: 18px; border: none; background: transparent;
+          font-size: 28px; font-weight: 800; text-align: center; color: #1d1d1f; outline: none;
+        }
+        .title-input:focus { border-bottom: 2px solid #0071e3; }
+        .subtitle { font-size: 14px; color: #86868b; margin-top: 6px; font-weight: 500; }
+
+        #liquid-modal-overlay {
+          position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+          background: rgba(0, 0, 0, 0.25); z-index: 99999; display: flex; justify-content: center; align-items: center;
+          opacity: 1; transition: opacity 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); backdrop-filter: blur(8px);
+        }
+        #liquid-modal-overlay.hidden { opacity: 0; pointer-events: none; }
+
+        #liquid-modal {
+          width: 85vw; max-width: 1000px; height: 75vh;
+          background: linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.4) 100%);
+          backdrop-filter: blur(50px) saturate(200%); -webkit-backdrop-filter: blur(50px) saturate(200%);
+          border: 1px solid rgba(255,255,255,0.9); border-radius: 36px;
+          box-shadow: 0 40px 100px rgba(0,0,0,0.2), inset 0 2px 15px rgba(255,255,255,0.8);
+          display: flex; flex-direction: column; overflow: hidden;
+          transform: scale(1) translateY(0); transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #liquid-modal-overlay.hidden #liquid-modal { transform: scale(0.9) translateY(40px); }
+
+        .modal-header {
+          display: flex; justify-content: space-between; align-items: center; padding: 20px 30px; border-bottom: 1px solid rgba(0,0,0,0.06); background: rgba(255,255,255,0.2);
+        }
+        .modal-header h3 { margin: 0; font-size: 24px; color: #1d1d1f; font-weight: 800; letter-spacing: 0.5px;}
+        .header-right { display: flex; gap: 15px; }
+
+        .glass-btn {
+          padding: 8px 18px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.6);
+          background: rgba(255,255,255,0.4); color: #1d1d1f; font-weight: 700; font-size: 15px;
+          cursor: pointer; backdrop-filter: blur(10px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: all 0.2s;
+        }
+        .glass-btn:hover { background: #fff; transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.1); }
+        .primary-btn { color: #0071e3; }
+        .close-btn { color: #ff3b30; padding: 8px 14px; }
+        .close-btn:hover { background: #ff3b30; color: #fff; border-color: #ff3b30; }
+
+        .modal-content {
+          flex: 1; padding: 30px; overflow-y: auto; display: grid; 
+          grid-template-columns: repeat(auto-fill, 150px); justify-content: start; gap: 30px; align-content: start;
+        }
+
+        #modal-edit-bar {
+          display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; background: rgba(255, 255, 255, 0.4);
+          border-top: 1px solid rgba(0,0,0,0.06); backdrop-filter: blur(30px); transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
+        }
+        #modal-edit-bar.hidden { transform: translateY(100%); opacity: 0; position: absolute; bottom: 0; width: 100%; pointer-events: none; }
+        #modal-select-count { font-weight: 700; color: #1d1d1f; font-size: 15px; }
+        .danger-btn { color: #ff3b30; }
+        .danger-btn:hover { background: #ff3b30; color: #fff; }
+
+        .file-item {
+          width: 150px; height: 150px; background: rgba(255,255,255,0.3); border-radius: 20px;
+          border: 1px solid rgba(255,255,255,0.6); box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+          display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+          overflow: hidden; cursor: pointer; padding: 12px; box-sizing: border-box;
+          position: relative; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+        }
+        .file-item:hover { transform: scale(1.05); background: rgba(255,255,255,0.6); }
+        .file-item.selected { transform: scale(0.92) !important; border-color: #0071e3; box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.2); }
+
+        .select-indicator {
+          position: absolute; top: 10px; right: 10px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.9);
+          background: rgba(0,0,0,0.25); display: none; align-items: center; justify-content: center;
+          color: white; font-weight: bold; font-size: 14px; z-index: 10; transition: all 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .edit-mode .select-indicator { display: flex; }
+        .file-item.selected .select-indicator { background: #0071e3; border-color: #0071e3; }
+        .file-item.selected .select-indicator::after { content: '✓'; }
+
+        .file-preview { 
+          width: 100%; height: 72%; border-radius: 12px; overflow: hidden; 
+          display: flex; align-items: center; justify-content: center; background: #f5f5f7; pointer-events: none; 
+        }
+        .file-preview img, .file-preview video { width: 100%; height: 100%; object-fit: cover; }
+        .file-preview .file-icon { font-size: 48px; }
+
+        .file-name { 
+          height: 28%; width: 100%; font-size: 13px; color: #1d1d1f; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+          display: flex; align-items: center; justify-content: center; pointer-events: none; padding-top: 5px; box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <div id="finger-cursor"></div>
+
+    <button id="back-to-main-btn" class="hidden">⬅ 返回记忆宇宙</button>
+    <button id="add-panel-btn" class="hidden">➕ 添加面板</button>
+
+    <div id="instructions">
+      <div class="inst-header">
+        <strong>🌟 交互视界操作指南：</strong>
+        <button id="minimize-inst-btn" title="最小化">➖</button>
+      </div>
+      <p>【记忆球界面】</p>
+      <p>1. <strong>滑动滚轮</strong>：缩放全局视野。</p>
+      <p>2. <strong>鼠标拖拽</strong>：推挤水晶球。</p>
+      <p>3. <strong>点击水晶球</strong>：进入 3D 专属场景。</p>
+      <br>
+      <p>【3D 场景漫游】</p>
+      <p>1. <strong>鼠标左键拖拽</strong>：自由旋转环顾。</p>
+      <p>2. <strong>W A S D</strong>：主角漫游行走。</p>
+      <p>3. <strong>➕添加面板</strong>：墙壁贴画，点击导入文件。</p>
+    </div>
+
+    <div id="minimized-instructions" class="hidden">
+      <button id="maximize-inst-btn">📘 Sara云盘世界的指南</button>
+    </div>
+
+    <input type="file" id="sys-file-input" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt" style="display: none;" />
+
+    <div id="liquid-modal-overlay" class="hidden">
+      <div id="liquid-modal">
+        <div class="modal-header">
+          <button id="modal-edit-btn" class="glass-btn">编辑</button>
+          <h3 id="modal-title">新建资料集</h3>
+          <div class="header-right">
+            <button id="modal-add-btn" class="glass-btn primary-btn">➕ 添加文件</button>
+            <button id="modal-close-btn" class="glass-btn close-btn">✖</button>
+          </div>
+        </div>
+        
+        <div class="modal-content" id="modal-file-grid"></div>
+
+        <div id="modal-edit-bar" class="hidden">
+          <button id="modal-cancel-btn" class="glass-btn">取消</button>
+          <div id="modal-select-count">已选择 0 项</div>
+          <button id="modal-delete-btn" class="glass-btn danger-btn">删除</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+        import * as CANNON from 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/+esm';
+
+        let scene, camera, renderer, raycaster, mouse;
+        let world;
+        let currentScene = 'MAIN';
+        let crystalBalls = [];
+        let innerContents = []; 
+
+        let draggedBody = null;
+        let hoveredObject = null;
+        let dragPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        let mouseDownPos = new THREE.Vector2();
+        let isDragging = false;
+        let glassPhysicsMaterial; 
+
+        let wallTop, wallBottom, wallLeft, wallRight;
+        let currentFrustumSize = 100;
+        const baseRadius = 6.0;
+
+        let controls;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, isSprinting = false;
+        let headBobTimer = 0;   
+        let headBobAmount = 0;  
+        let previousBobOffset = 0; 
+
+        let roomModel = null;        
+        let isAddingPanel = false;   
+        let memoirPanels = [];       
+        let activeSpaceDraggingPanel = null; 
+        let roomBounds = null; 
+
+        let currentOpenedPanel = null; 
+        let isEditMode = false;              
+        let selectedFileIndices = new Set(); 
+        let currentClickedTitle = ""; 
+
+        const folderData = [
+          { title: "莽山团建", img: "https://i.postimg.cc/63DW9tVV/P2027339.jpg", size: "1,216 | 26.85GB" }, 
+          { title: "调皮的猪咪", img: "https://i.postimg.cc/zf1VkXZd/Mask_group_2.png", size: "842 | 12.40GB" },    
+          { title: "UI灵感库", img: "https://i.postimg.cc/brCZ0K1D/8378e377393c0edaac415b4b947970ec.jpg", size: "3,405 | 58.20GB" },
+          { title: "专利文件", img: "https://picsum.photos/seed/patent/600/600", size: "24 | 1.20GB" },
+          { title: "读书笔记", img: "https://i.postimg.cc/x1mXHN7M/Frame_2119906831.png", size: "128 | 3.50GB" },
+          { title: "灵感随记", img: "https://i.postimg.cc/tgt7vQpK/Mask_group_4.png", size: "56 | 0.85GB" },
+          { title: "旅行风景", img: "https://i.postimg.cc/q7dzGMV1/Frame_2119906840.png", size: "2,109 | 45.10GB" },
+          { title: "生活碎片", img: "https://i.postimg.cc/8CVjbPQX/Mask_group_1.png", size: "956 | 18.30GB" },
+          { title: "我的写真", img: "https://i.postimg.cc/rpLK9FXn/Frame_2119906841.png", size: "412 | 8.90GB" },
+          { title: "我的家", img: "https://i.postimg.cc/3wCWf53T/Mask_group.png", size: "320 | 6.40GB" },
+          { title: "插画练习", img: "https://i.postimg.cc/HL4jvDTD/Mask_group_5.png", size: "145 | 4.20GB" },
+          { title: "摄影作品", img: "https://picsum.photos/seed/photo/600/600", size: "890 | 32.50GB" },
+          { title: "音乐收藏", img: "https://picsum.photos/seed/music/600/600", size: "450 | 15.60GB" },
+          { title: "电影清单", img: "https://picsum.photos/seed/movie/600/600", size: "85 | 120.5GB" },
+          { title: "活动策划", img: "https://i.postimg.cc/JhctYVMg/Mask_group_3.png", size: "12 | 0.50GB" }
+        ];
+
+        const modelRegistry = {
+          "调皮的猪咪": "https://raw.githubusercontent.com/hattiehuang/3d/main/bedroom.compressed.glb",
+          "插画练习": "https://raw.githubusercontent.com/hattiehuang/3d-2/main/freeman_alley_in_new_york_city.glb",
+          "音乐收藏": "https://raw.githubusercontent.com/hattiehuang/3d-2/main/hintze_hall.glb",
+          "旅行风景": "https://raw.githubusercontent.com/hattiehuang/3d-2/main/moosstock_mountain_peak_3024_m.glb",
+          "摄影作品": "https://raw.githubusercontent.com/hattiehuang/3d-2/main/the_smoking_room.glb",
+          "我的家": "https://raw.githubusercontent.com/hattiehuang/3d-2/main/the_upper_vestibule.glb",
+          "default": "https://raw.githubusercontent.com/hattiehuang/3d/main/bedroom.compressed.glb" 
+        };
+
+        const cursor = document.getElementById('finger-cursor');
+
+        init();
+        animate();
+
+        function init() {
+          const container = document.getElementById('canvas-container');
+          scene = new THREE.Scene(); scene.background = new THREE.Color(0xffffff); 
+          
+          const aspect = window.innerWidth / window.innerHeight;
+          camera = new THREE.OrthographicCamera(currentFrustumSize * aspect / -2, currentFrustumSize * aspect / 2, currentFrustumSize / 2, currentFrustumSize / -2, 0.1, 1000);
+          camera.position.set(0, 0, 100); 
+
+          renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+          renderer.setSize(window.innerWidth, window.innerHeight);
+          renderer.setPixelRatio(window.devicePixelRatio);
+          renderer.physicallyCorrectLights = true;
+          renderer.toneMapping = THREE.ACESFilmicToneMapping;
+          renderer.outputEncoding = THREE.sRGBEncoding;
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+          container.appendChild(renderer.domElement);
+
+          scene.add(new THREE.AmbientLight(0xffffff, 1.5)); 
+          const topLight = new THREE.DirectionalLight(0xffffff, 1.5); topLight.position.set(20, 50, 20); topLight.castShadow = true; scene.add(topLight);
+          const sideLight = new THREE.DirectionalLight(0xeef2f5, 1.0); sideLight.position.set(-30, 20, 20); scene.add(sideLight);
+
+          raycaster = new THREE.Raycaster(); mouse = new THREE.Vector2();
+
+          initPhysics(); createCrystalBalls(); initUIEvents();
+
+          window.addEventListener('resize', onWindowResize);
+          window.addEventListener('mousemove', onMouseMove);
+          window.addEventListener('mousedown', onMouseDown);
+          window.addEventListener('mouseup', onMouseUp);
+          window.addEventListener('mouseleave', onMouseUp);
+          window.addEventListener('wheel', onWheel, { passive: false });
+        }
+
+        function initUIEvents() {
+          document.getElementById('minimize-inst-btn').addEventListener('click', () => {
+            document.getElementById('instructions').classList.add('hidden');
+            document.getElementById('minimized-instructions').classList.remove('hidden');
+          });
+          document.getElementById('maximize-inst-btn').addEventListener('click', () => {
+            document.getElementById('minimized-instructions').classList.add('hidden');
+            document.getElementById('instructions').classList.remove('hidden');
+          });
+
+          const addBtn = document.getElementById('add-panel-btn');
+          addBtn.addEventListener('click', () => {
+            isAddingPanel = true; document.body.style.cursor = 'crosshair';
+            addBtn.innerText = "请点击房间放置..."; addBtn.style.background = "#e74c3c";
+          });
+
+          document.getElementById('modal-close-btn').addEventListener('click', () => {
+            document.getElementById('liquid-modal-overlay').classList.add('hidden');
+            exitEditMode(); currentOpenedPanel = null;
+            if (controls && currentScene === 'ROOM') controls.enabled = true; 
+          });
+
+          document.getElementById('modal-add-btn').addEventListener('click', () => {
+            document.getElementById('sys-file-input').click();
+          });
+
+          document.getElementById('sys-file-input').addEventListener('change', (e) => {
+            if (!currentOpenedPanel) return;
+            const files = Array.from(e.target.files);
+            files.forEach(file => { currentOpenedPanel.filesData.push({ name: file.name, type: file.type, size: file.size, url: URL.createObjectURL(file) }); });
+            updatePanelSubtitle(); renderModalFileGrid(); currentOpenedPanel.updateCarousel(); e.target.value = ''; 
+          });
+
+          const modalContainer = document.getElementById('liquid-modal');
+          const editBar = document.getElementById('modal-edit-bar');
+          const countText = document.getElementById('modal-select-count');
+
+          document.getElementById('modal-edit-btn').addEventListener('click', () => {
+            if (!currentOpenedPanel || currentOpenedPanel.filesData.length === 0) return;
+            isEditMode = true; selectedFileIndices.clear();
+            modalContainer.classList.add('edit-mode'); editBar.classList.remove('hidden');
+            updateCountText(); renderModalFileGrid(); 
+          });
+
+          document.getElementById('modal-cancel-btn').addEventListener('click', exitEditMode);
+
+          document.getElementById('modal-delete-btn').addEventListener('click', () => {
+            if (selectedFileIndices.size === 0 || !currentOpenedPanel) return;
+            currentOpenedPanel.filesData = currentOpenedPanel.filesData.filter((_, idx) => !selectedFileIndices.has(idx));
+            updatePanelSubtitle(); currentOpenedPanel.updateCarousel(); exitEditMode();
+          });
+
+          function updateCountText() { countText.innerText = `已选择 ${selectedFileIndices.size} 项`; }
+          
+          document.getElementById('back-to-main-btn').addEventListener('click', returnToMainScene);
+        }
+
+        function returnToMainScene() {
+          currentScene = 'MAIN';
+          document.getElementById('back-to-main-btn').classList.add('hidden');
+          document.getElementById('add-panel-btn').classList.add('hidden');
+          if (cursor) cursor.style.display = ''; 
+          
+          memoirPanels.forEach(panel => { panel.element.style.display = 'none'; });
+          
+          if (roomModel) { scene.remove(roomModel); roomModel = null; }
+          const tempObjects = scene.children.filter(c => c.name === 'roomTemp');
+          tempObjects.forEach(obj => scene.remove(obj));
+          
+          if (controls) { controls.dispose(); controls = null; }
+          
+          const aspect = window.innerWidth / window.innerHeight;
+          camera = new THREE.OrthographicCamera(currentFrustumSize * aspect / -2, currentFrustumSize * aspect / 2, currentFrustumSize / 2, currentFrustumSize / -2, 0.1, 1000);
+          camera.position.set(0, 0, 100); camera.updateProjectionMatrix();
+          
+          while (world.bodies.length > 0) { world.removeBody(world.bodies[0]); }
+          crystalBalls = []; innerContents = [];
+          initPhysics(); createCrystalBalls();
+        }
+
+        function exitEditMode() {
+          isEditMode = false; selectedFileIndices.clear();
+          document.getElementById('liquid-modal').classList.remove('edit-mode');
+          document.getElementById('modal-edit-bar').classList.add('hidden');
+          renderModalFileGrid();
+        }
+
+        function updatePanelSubtitle() {
+            if (!currentOpenedPanel) return;
+            const totalSize = currentOpenedPanel.filesData.reduce((sum, f) => sum + f.size, 0);
+            const sizeGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2);
+            const subtitle = currentOpenedPanel.element.querySelector('.subtitle');
+            subtitle.innerText = `${currentOpenedPanel.filesData.length} 份文件 | ${sizeGB}GB`;
+        }
+
+        function renderModalFileGrid() {
+          const grid = document.getElementById('modal-file-grid'); grid.innerHTML = '';
+          if (!currentOpenedPanel) return;
+
+          currentOpenedPanel.filesData.forEach((fileObj, idx) => {
+            const el = document.createElement('div'); el.className = 'file-item';
+            if (isEditMode && selectedFileIndices.has(idx)) el.classList.add('selected');
+            let previewHTML = '';
+            if (fileObj.type.startsWith('image/')) previewHTML = `<img src="${fileObj.url}" />`;
+            else if (fileObj.type.startsWith('video/')) previewHTML = `<video src="${fileObj.url}" autoplay muted loop></video>`;
+            else previewHTML = `<div class="file-icon">📄</div>`;
+            
+            el.innerHTML = `<div class="select-indicator"></div><div class="file-preview">${previewHTML}</div><div class="file-name" title="${fileObj.name}">${fileObj.name}</div>`;
+            
+            el.addEventListener('click', () => {
+              if (isEditMode) {
+                if (selectedFileIndices.has(idx)) { selectedFileIndices.delete(idx); el.classList.remove('selected'); } 
+                else { selectedFileIndices.add(idx); el.classList.add('selected'); }
+                document.getElementById('modal-select-count').innerText = `已选择 ${selectedFileIndices.size} 项`;
+              } 
+            });
+            grid.appendChild(el);
+          });
+        }
+
+        function createMemoirPanel(intersectPoint) {
+          const panelData = {
+            position: intersectPoint.clone(), element: document.createElement('div'), currentIndex: 0, filesData: [], intervalId: null,
+            sceneTitle: currentClickedTitle, 
+            updateCarousel: function() {
+                const container = this.element.querySelector('.carousel-container');
+                const mediaFiles = this.filesData.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+
+                if (mediaFiles.length > 0) {
+                    container.innerHTML = mediaFiles.map((f, index) => {
+                        const cls = index === 0 ? 'media-item active' : 'media-item';
+                        if (f.type.startsWith('video/')) return `<video src="${f.url}" class="${cls}" autoplay muted loop playsinline></video>`;
+                        return `<img src="${f.url}" class="${cls}" />`;
+                    }).join('');
+                } else {
+                    container.innerHTML = `<div class="empty-cover active">＋</div>`;
+                }
+                this.currentIndex = 0; if (this.intervalId) clearInterval(this.intervalId);
+                const items = container.querySelectorAll('.media-item');
+                if (items.length > 1) {
+                    this.intervalId = setInterval(() => {
+                        items[this.currentIndex].classList.remove('active');
+                        this.currentIndex = (this.currentIndex + 1) % items.length;
+                        items[this.currentIndex].classList.add('active');
+                    }, 3000); 
+                }
+            }
+          };
+
+          panelData.element.className = 'memoir-panel-container';
+          panelData.element.innerHTML = `
+            <div class="drag-handle" title="按住拔起图钉移动位置">📌</div>
+            <div class="memoir-card" title="点击打开资料集">
+              <div class="carousel-container">
+                <div class="empty-cover active">＋</div>
+              </div>
+              <input type="text" value="新建资料集" class="title-input" title="点击修改名称" />
+              <div class="subtitle">0 份文件 | 0.00GB</div>
+            </div>
+          `;
+          document.body.appendChild(panelData.element);
+
+          const input = panelData.element.querySelector('.title-input');
+          input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+
+          const dragHandle = panelData.element.querySelector('.drag-handle');
+          dragHandle.addEventListener('mousedown', (e) => {
+            e.stopPropagation(); if (controls) controls.enabled = false; activeSpaceDraggingPanel = panelData; dragHandle.classList.add('is-dragging');
+          });
+
+          const card = panelData.element.querySelector('.memoir-card');
+          card.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('title-input')) return;
+            currentOpenedPanel = panelData; document.getElementById('modal-title').innerText = input.value; renderModalFileGrid();
+            document.getElementById('liquid-modal-overlay').classList.remove('hidden'); if (controls) controls.enabled = false; 
+          });
+          memoirPanels.push(panelData);
+        }
+
+        function initPhysics() {
+          world = new CANNON.World({ gravity: new CANNON.Vec3(0, -600, 0) });
+          glassPhysicsMaterial = new CANNON.Material('glass');
+          const glassContactMaterial = new CANNON.ContactMaterial(glassPhysicsMaterial, glassPhysicsMaterial, { friction: 0.8, restitution: 0.0 });
+          world.addContactMaterial(glassContactMaterial);
+
+          const wallShape = new CANNON.Plane(); const wallMaterial = new CANNON.Material('wall'); 
+          const createWallBody = (quat) => {
+            const wall = new CANNON.Body({ mass: 0, material: wallMaterial }); wall.addShape(wallShape); wall.quaternion.copy(quat); world.addBody(wall);
+            world.addContactMaterial(new CANNON.ContactMaterial(glassPhysicsMaterial, wallMaterial, { friction: 0.5, restitution: 0.0 })); return wall;
+          };
+          wallBottom = createWallBody(new CANNON.Quaternion().setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2));
+          wallTop = createWallBody(new CANNON.Quaternion().setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2));
+          wallLeft = createWallBody(new CANNON.Quaternion().setFromAxisAngle(new CANNON.Vec3(0, 1, 0), Math.PI / 2));
+          wallRight = createWallBody(new CANNON.Quaternion().setFromAxisAngle(new CANNON.Vec3(0, 1, 0), -Math.PI / 2));
+          updatePhysicsWalls();
+        }
+
+        function updatePhysicsWalls() {
+          if (!wallBottom || currentScene !== 'MAIN') return;
+          const aspect = window.innerWidth / window.innerHeight; const height = currentFrustumSize; const width = currentFrustumSize * aspect;
+          wallBottom.position.set(0, -height / 2, 0); wallTop.position.set(0, height / 2, 0); wallLeft.position.set(-width / 2, 0, 0); wallRight.position.set(width / 2, 0, 0);
+        }
+
+        function createTextSprite(title, sizeText) {
+          const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256; const ctx = canvas.getContext('2d');
+          ctx.font = 'bold 80px "PingFang SC", "Microsoft YaHei", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffffff'; 
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2; ctx.fillText(`“${title}”`, 256, 100); 
+          ctx.font = 'bold 44px "PingFang SC", "Microsoft YaHei", sans-serif'; ctx.fillText(sizeText, 256, 180);
+          const texture = new THREE.CanvasTexture(canvas); const spriteMaterial = new THREE.SpriteMaterial({ map: texture, depthTest: false, depthWrite: false, toneMapped: false });
+          const sprite = new THREE.Sprite(spriteMaterial); sprite.renderOrder = 999; sprite.scale.set(8.5, 4.25, 1); return sprite;
+        }
+
+        function createCrystalBalls() {
+          const geometry = new THREE.SphereGeometry(baseRadius, 64, 64); const innerCircleGeo = new THREE.CircleGeometry(baseRadius - 0.1, 64);
+          const material = new THREE.MeshPhysicalMaterial({ transmission: 1.0, opacity: 1.0, color: 0xe8edf2, roughness: 0.02, ior: 1.55, thickness: 5.0, specularIntensity: 0.5, clearcoat: 0.1, side: THREE.DoubleSide });
+          const textureLoader = new THREE.TextureLoader(); textureLoader.setCrossOrigin('anonymous');
+
+          for (let i = 0; i < 15; i++) { 
+            const data = folderData[i];
+            const mesh = new THREE.Mesh(geometry, material.clone()); scene.add(mesh);
+
+            const innerGroup = new THREE.Group();
+            const texture = textureLoader.load(data.img, (tex) => {
+              tex.anisotropy = renderer.capabilities.getMaxAnisotropy(); tex.minFilter = THREE.LinearMipmapLinearFilter;
+              tex.generateMipmaps = true; tex.encoding = THREE.sRGBEncoding; const imageAspect = tex.image.width / tex.image.height;
+              if (imageAspect > 1) { tex.repeat.set(1 / imageAspect, 1); tex.offset.set((1 - 1 / imageAspect) / 2, 0); } else { tex.repeat.set(1, imageAspect); tex.offset.set(0, (1 - imageAspect) / 2); }
+            });
+
+            const imgMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+            const imgMesh = new THREE.Mesh(innerCircleGeo, imgMat); innerGroup.add(imgMesh);
+            const textSprite = createTextSprite(data.title, data.size); textSprite.position.set(0, -2.5, 1.5); innerGroup.add(textSprite);
+
+            scene.add(innerGroup); innerContents.push(innerGroup);
+
+            const body = new CANNON.Body({ mass: 500, shape: new CANNON.Sphere(baseRadius), material: glassPhysicsMaterial, position: new CANNON.Vec3((Math.random() - 0.5) * 40, (Math.random() - 0.5) * 20 + 50, 0) });
+            body.linearFactor.set(1, 1, 0); body.angularFactor.set(0, 0, 1); body.linearDamping = 0.8; body.angularDamping = 0.8; 
+
+            world.addBody(body);
+            mesh.userData = { type: 'crystal', physicsBody: body, title: data.title }; 
+            crystalBalls.push(mesh);
+          }
+        }
+
+        function loadRoomScene(title) {
+          currentScene = 'ROOM';
+          if (cursor) cursor.style.display = 'none';
+          document.getElementById('add-panel-btn').classList.remove('hidden');
+          document.getElementById('back-to-main-btn').classList.remove('hidden');
+
+          crystalBalls.forEach(ball => scene.remove(ball));
+          innerContents.forEach(content => scene.remove(content)); 
+          while (world.bodies.length > 0) { world.removeBody(world.bodies[0]); }
+          
+          camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 5000);
+          controls = new OrbitControls(camera, renderer.domElement);
+          controls.enableDamping = true; controls.dampingFactor = 0.05; controls.maxPolarAngle = Math.PI / 2 + 0.05; 
+
+          const gridHelper = new THREE.GridHelper(100, 100, 0xcccccc, 0xe2e8f0); 
+          gridHelper.name = 'roomTemp';
+          scene.add(gridHelper);
+
+          const loader = new GLTFLoader();
+          const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/'); loader.setDRACOLoader(dracoLoader);
+
+          const targetModelUrl = modelRegistry[title] || modelRegistry["default"];
+
+          loader.load(targetModelUrl, function (gltf) {
+            const model = gltf.scene; roomModel = model;
+            model.position.set(0, 0, 0); model.scale.set(1, 1, 1); model.updateMatrixWorld();
+
+            const box = new THREE.Box3().setFromObject(model); const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            if (maxDim > 0) { const scaleFactor = 146 / maxDim; model.scale.set(scaleFactor, scaleFactor, scaleFactor); model.updateMatrixWorld(); }
+
+            const boxScaled = new THREE.Box3().setFromObject(model); const centerScaled = boxScaled.getCenter(new THREE.Vector3());
+            model.position.x = -centerScaled.x; model.position.z = -centerScaled.z; model.position.y = -boxScaled.min.y; 
+
+            roomBounds = new THREE.Box3().setFromObject(model);
+            const paddingX = 18; const paddingZ = 18; 
+            roomBounds.min.x += paddingX; roomBounds.max.x -= paddingX; roomBounds.min.z += paddingZ; roomBounds.max.z -= paddingZ;
+
+            camera.position.set(0, 15, 30); controls.target.set(0, (boxScaled.max.y - boxScaled.min.y) / 2, 0); controls.update();
+
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true; child.receiveShadow = true;
+                    if (child.material) {
+                        child.material.side = THREE.DoubleSide; 
+                        if (child.material.map) { child.material.map.anisotropy = renderer.capabilities.getMaxAnisotropy(); child.material.map.minFilter = THREE.LinearMipmapLinearFilter; child.material.map.magFilter = THREE.LinearFilter; child.material.map.needsUpdate = true; }
+                    }
+                }
+            });
+
+            scene.add(model);
+            
+            const ambientLightRoom = new THREE.AmbientLight(0xffffff, 1.2);
+            ambientLightRoom.name = 'roomTemp'; scene.add(ambientLightRoom);
+            const roomLight = new THREE.PointLight(0xfff5e6, 1.5, 100); 
+            roomLight.position.set(0, 20, 0); roomLight.name = 'roomTemp'; scene.add(roomLight);
+          });
+          initKeyboardWalk();
+        }
+
+        function initKeyboardWalk() {
+          document.addEventListener('keydown', (event) => {
+            if (currentScene !== 'ROOM' || currentOpenedPanel) return;
+            switch ( event.code ) {
+              case 'ArrowUp': case 'KeyW': moveForward = true; break;
+              case 'ArrowLeft': case 'KeyA': moveLeft = true; break;
+              case 'ArrowDown': case 'KeyS': moveBackward = true; break;
+              case 'ArrowRight': case 'KeyD': moveRight = true; break;
+              case 'ShiftLeft': case 'ShiftRight': isSprinting = true; break;
+            }
+          });
+          document.addEventListener('keyup', (event) => {
+            if (currentScene !== 'ROOM') return;
+            switch ( event.code ) {
+              case 'ArrowUp': case 'KeyW': moveForward = false; break;
+              case 'ArrowLeft': case 'KeyA': moveLeft = false; break;
+              case 'ArrowDown': case 'KeyS': moveBackward = false; break;
+              case 'ArrowRight': case 'KeyD': moveRight = false; break;
+              case 'ShiftLeft': case 'ShiftRight': isSprinting = false; break;
+            }
+          });
+        }
+
+        function onWheel(event) {
+          if (currentScene !== 'MAIN') return;
+          event.preventDefault(); 
+          currentFrustumSize += event.deltaY * 0.05; currentFrustumSize = Math.max(40, Math.min(currentFrustumSize, 200)); 
+          const aspect = window.innerWidth / window.innerHeight;
+          camera.left = currentFrustumSize * aspect / -2; camera.right = currentFrustumSize * aspect / 2; camera.top = currentFrustumSize / 2; camera.bottom = currentFrustumSize / -2;
+          camera.updateProjectionMatrix(); updatePhysicsWalls(); crystalBalls.forEach(ball => ball.userData.physicsBody.wakeUp());
+        }
+
+        function onMouseDown(event) {
+          if (currentOpenedPanel) return; 
+
+          mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+          mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+          if (currentScene === 'ROOM' && isAddingPanel && roomModel) {
+            raycaster.setFromCamera(mouse, camera); const intersects = raycaster.intersectObject(roomModel, true);
+            if (intersects.length > 0) {
+              createMemoirPanel(intersects[0].point); isAddingPanel = false; document.body.style.cursor = 'default';
+              const addBtn = document.getElementById('add-panel-btn'); addBtn.innerText = "➕ 添加面板"; addBtn.style.background = "rgba(0, 0, 0, 0.8)";
+            }
+            return;
+          }
+
+          if (currentScene !== 'MAIN') return;
+          mouseDownPos.set(event.clientX, event.clientY);
+          if (hoveredObject && hoveredObject.userData.type === 'crystal') {
+            isDragging = true; draggedBody = hoveredObject.userData.physicsBody; draggedBody.mass = 0; draggedBody.updateMassProperties(); draggedBody.velocity.set(0, 0, 0); draggedBody.angularVelocity.set(0, 0, 0); 
+            currentClickedTitle = hoveredObject.userData.title; 
+          }
+        }
+
+        function onMouseMove(event) {
+          if (currentOpenedPanel) return; 
+
+          mouse.x = (event.clientX / window.innerWidth) * 2 - 1; mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+          if (currentScene === 'ROOM' && activeSpaceDraggingPanel && roomModel) {
+            raycaster.setFromCamera(mouse, camera); const intersects = raycaster.intersectObject(roomModel, true);
+            if (intersects.length > 0) { activeSpaceDraggingPanel.position.copy(intersects[0].point); }
+            return; 
+          }
+
+          if (currentScene !== 'MAIN') return;
+          if(cursor) { cursor.style.left = event.clientX + 'px'; cursor.style.top = event.clientY + 'px'; }
+          if (isDragging && draggedBody) {
+            raycaster.setFromCamera(mouse, camera); const targetPos = new THREE.Vector3(); raycaster.ray.intersectPlane(dragPlane, targetPos);
+            draggedBody.velocity.set((targetPos.x - draggedBody.position.x) * 60, (targetPos.y - draggedBody.position.y) * 60, 0);
+          }
+          raycaster.setFromCamera(mouse, camera); const intersects = raycaster.intersectObjects(crystalBalls);
+          if (hoveredObject && (!intersects.length || intersects[0].object !== hoveredObject)) { hoveredObject = null; if(cursor) cursor.style.transform = 'translate(-50%, -50%) scale(1)'; }
+          if (intersects.length > 0 && !isDragging) { hoveredObject = intersects[0].object; if(cursor) cursor.style.transform = 'translate(-50%, -50%) scale(1.5)'; }
+        }
+
+        function onMouseUp(event) {
+          if (activeSpaceDraggingPanel) {
+            const handle = activeSpaceDraggingPanel.element.querySelector('.drag-handle');
+            if (handle) handle.classList.remove('is-dragging'); 
+            activeSpaceDraggingPanel = null; if (controls) controls.enabled = true; 
+          }
+
+          if (currentScene !== 'MAIN') return;
+          const moveDistance = mouseDownPos.distanceTo(new THREE.Vector2(event.clientX || 0, event.clientY || 0));
+          if (isDragging && draggedBody) { 
+            draggedBody.mass = 500; draggedBody.updateMassProperties(); isDragging = false; draggedBody = null; 
+            if (event.type === 'mouseup' && moveDistance < 5) {
+              loadRoomScene(currentClickedTitle);
+            }
+          }
+        }
+
+        function onWindowResize() {
+          const aspect = window.innerWidth / window.innerHeight;
+          if (currentScene === 'MAIN') {
+              camera.left = currentFrustumSize * aspect / -2; camera.right = currentFrustumSize * aspect / 2; camera.top = currentFrustumSize / 2; camera.bottom = currentFrustumSize / -2;
+              camera.updateProjectionMatrix(); updatePhysicsWalls(); 
+          } else { camera.aspect = aspect; camera.updateProjectionMatrix(); }
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+          requestAnimationFrame(animate);
+
+          if (currentScene === 'MAIN') {
+            world.step(1 / 60, 0.016, 10);
+            crystalBalls.forEach((ball, index) => {
+              const body = ball.userData.physicsBody; body.position.z = 0; body.velocity.z = 0;
+              ball.position.copy(body.position); ball.quaternion.copy(body.quaternion); innerContents[index].position.copy(body.position);
+            });
+          }
+
+          if (currentScene === 'ROOM' && controls) {
+            controls.update(); 
+            const walkSpeed = isSprinting ? 0.6 : 0.2; 
+            const camDir = new THREE.Vector3(); camera.getWorldDirection(camDir); camDir.y = 0; camDir.normalize();
+            const camRight = new THREE.Vector3(); camRight.crossVectors(camera.up, camDir).normalize();
+
+            let moveX = 0; let moveZ = 0;
+            if (moveForward) { moveX += camDir.x; moveZ += camDir.z; }
+            if (moveBackward) { moveX -= camDir.x; moveZ -= camDir.z; }
+            if (moveLeft) { moveX -= camRight.x; moveZ -= camRight.z; }
+            if (moveRight) { moveX += camRight.x; moveZ += camRight.z; }
+
+            const moveVec = new THREE.Vector2(moveX, moveZ).normalize();
+            
+            if (moveVec.lengthSq() > 0) {
+                let deltaX = moveVec.x * walkSpeed; let deltaZ = moveVec.y * walkSpeed;
+                if (roomBounds) {
+                    const buffer = 12; 
+                    if (deltaX > 0 && controls.target.x > roomBounds.max.x - buffer) { deltaX *= Math.max(0, (roomBounds.max.x - controls.target.x) / buffer); } else if (deltaX < 0 && controls.target.x < roomBounds.min.x + buffer) { deltaX *= Math.max(0, (controls.target.x - roomBounds.min.x) / buffer); }
+                    if (deltaZ > 0 && controls.target.z > roomBounds.max.z - buffer) { deltaZ *= Math.max(0, (roomBounds.max.z - controls.target.z) / buffer); } else if (deltaZ < 0 && controls.target.z < roomBounds.min.z + buffer) { deltaZ *= Math.max(0, (controls.target.z - roomBounds.min.z) / buffer); }
+                }
+                camera.position.x += deltaX; camera.position.z += deltaZ; controls.target.x += deltaX; controls.target.z += deltaZ;
+            }
+
+            const isMoving = (moveForward || moveBackward || moveLeft || moveRight);
+            const targetBobAmount = isMoving ? (isSprinting ? 0.8 : 0.3) : 0; 
+            headBobAmount += (targetBobAmount - headBobAmount) * 0.9; 
+            const bobSpeed = isSprinting ? 15 : 10; 
+            if (isMoving) headBobTimer += 0.016 * bobSpeed; 
+
+            const currentBobOffset = Math.sin(headBobTimer) * headBobAmount;
+            const bobDelta = currentBobOffset - previousBobOffset; previousBobOffset = currentBobOffset;
+            camera.position.y += bobDelta; controls.target.y += bobDelta; 
+
+            if (roomBounds) {
+                controls.target.x = THREE.MathUtils.clamp(controls.target.x, roomBounds.min.x, roomBounds.max.x); controls.target.z = THREE.MathUtils.clamp(controls.target.z, roomBounds.min.z, roomBounds.max.z);
+                camera.position.x = THREE.MathUtils.clamp(camera.position.x, roomBounds.min.x, roomBounds.max.x); camera.position.z = THREE.MathUtils.clamp(camera.position.z, roomBounds.min.z, roomBounds.max.z);
+                camera.position.y = THREE.MathUtils.clamp(camera.position.y, roomBounds.min.y + 1, roomBounds.max.y - 1);
+            }
+
+            memoirPanels.forEach(panel => {
+              if (panel.sceneTitle !== currentClickedTitle) { panel.element.style.display = 'none'; return; }
+              const tempV = panel.position.clone(); tempV.project(camera); 
+              if (tempV.z > 1) { panel.element.style.display = 'none'; return; }
+              panel.element.style.display = 'block';
+              const x = (tempV.x * 0.5 + 0.5) * window.innerWidth; const y = -(tempV.y * 0.5 - 0.5) * window.innerHeight;
+              const dist = camera.position.distanceTo(panel.position); const scale = Math.max(0.4, Math.min(1.8, 35 / dist)); 
+
+              panel.element.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${scale})`;
+              
+              if (activeSpaceDraggingPanel === panel || currentOpenedPanel === panel) {
+                 panel.element.style.zIndex = 9999;
+              } else {
+                 panel.element.style.zIndex = Math.max(1, Math.floor(1000 - dist));
+              }
+            });
+          }
+
+          renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
